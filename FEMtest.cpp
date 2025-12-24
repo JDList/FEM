@@ -366,8 +366,6 @@ int main() {
 
     split_each_triangle_in_two(nodes, elements);
     split_each_triangle_in_two(nodes, elements);
-    split_each_triangle_in_two(nodes, elements);
-    split_each_triangle_in_two(nodes, elements);
 
     double E = 10000000.0;
     double nu = 0.25;
