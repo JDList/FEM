@@ -1,0 +1,1 @@
+This repo contains a Finite Element Modelling program to solve 2D mechanical problems using Direchlet conditions in either plane stress or plane strain conditions. The only required libraries are Eigen for the sparse matrix solver.
