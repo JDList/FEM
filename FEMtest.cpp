@@ -10,7 +10,6 @@
 #include <stdexcept>
 
 
-
 void applyDirichletStrong(Eigen::SparseMatrix<double> &K,
                           Eigen::VectorXd &F,
                           const std::vector<char> &is_dirichlet,
@@ -316,7 +315,8 @@ void split_each_triangle_in_two(
 int main() {
     using namespace std;
     using size_type = linalg::size_type;
-    /* L-shape
+
+
     vector<array<double,2>> nodes = {
         {0.0,0.0}, {0.0,1.0}, {1.0,1.0}, {1.0,0.0},
         {2.0,1.0}, {2.0,0.0}, {3.0,1.0}, {3.0,0.0},
@@ -332,15 +332,15 @@ int main() {
         {12,14,15}, {12,13,15}, {14,16,17}, {14,15,17},
         {16,18,19}, {16,17,19} 
     };
-/* Square
+    /*Square
     vector<array<double,2>> nodes = {
         {0.0,0.0}, {0.0,5.0}, {5.0,0.0}, {5.0,5.0}
     };
-
     vector<array<int,3>> elements = {
         {0,1,3}, {0,2,3}
     };
-*/
+    */
+/* cored semicircle
 
     vector<array<double,2>> nodes;
     vector<array<int,3>> elements;
@@ -363,10 +363,17 @@ int main() {
         elements.emplace_back(std::array<int,3>{(int)(k),(int)(k+1),(int)(num_per_curve+k)});
         elements.emplace_back(std::array<int,3>{(int)(num_per_curve+k),(int)(num_per_curve+k+1), (int)(k+1)});
     }
-
+*/
     split_each_triangle_in_two(nodes, elements);
     split_each_triangle_in_two(nodes, elements);
-
+    split_each_triangle_in_two(nodes, elements);
+    split_each_triangle_in_two(nodes, elements);
+    split_each_triangle_in_two(nodes, elements);
+    split_each_triangle_in_two(nodes, elements);
+    split_each_triangle_in_two(nodes, elements);
+    split_each_triangle_in_two(nodes, elements);
+    
+    
     double E = 10000000.0;
     double nu = 0.25;
     bool plane_stress = true;
@@ -435,11 +442,11 @@ int main() {
 
     
     for (size_t n = 0; n < nodes.size(); ++n) {
-        if ((std::abs(nodes[n][1] - 0.0) < tol)&&(std::abs(nodes[n][0] - 10.0) <tol)) {
+        if ((std::abs(nodes[n][1] - 5.0) < tol)&&(std::abs(nodes[n][0] - 5.0) <tol)) {
             int dof_u = 2 * static_cast<int>(n);
             if (!is_dirichlet[dof_u]) {
                 is_dirichlet[dof_u] = 1;
-                prescribed[dof_u]   = 1.0;
+                prescribed[dof_u]   = 2.0;
                 prescribed[dof_u+1] = 0.0;
             }
         }
