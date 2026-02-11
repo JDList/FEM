@@ -10,6 +10,8 @@
 #include <stdexcept>
 
 
+
+
 void applyDirichletStrong(Eigen::SparseMatrix<double> &K,
                           Eigen::VectorXd &F,
                           const std::vector<char> &is_dirichlet,
@@ -20,15 +22,7 @@ void applyDirichletStrong(Eigen::SparseMatrix<double> &K,
     if ((int)F.size() != Ndof) throw std::runtime_error("applyDirichletStrong: F size mismatch");
     if ((int)prescribed.size() != Ndof) throw std::runtime_error("applyDirichletStrong: prescribed size mismatch");
 
-    std::vector<int> fixed;
-    std::vector<int> is_fixed_index(Ndof, -1);
-    for (int d = 0; d < Ndof; ++d) {
-        if (is_dirichlet[d]) {
-            is_fixed_index[d] = (int)fixed.size();
-            fixed.push_back(d);
-        }
-    }
-    if (fixed.empty()) return;
+ 
 
     K.makeCompressed();
 
@@ -58,12 +52,11 @@ void applyDirichletStrong(Eigen::SparseMatrix<double> &K,
     }
 
     
-    for (int d : fixed) {
-        K.coeffRef(d, d) = 1.0;
-    }
-
-    for (int d : fixed) {
-        F[d] = prescribed[d];
+   for (int d = 0; d < Ndof; ++d) {
+        if (is_dirichlet[d]) {
+            K.coeffRef(d, d) = 1.0;
+            F[d] = prescribed[d];
+        }
     }
 
     K.prune(0.0);
@@ -312,6 +305,113 @@ void split_each_triangle_in_two(
     nodes_in = std::move(nodes_out);
     elems_in = std::move(elems_out);
 }
+
+
+void applyDirichletLeftBoundary(
+    const std::vector<std::array<double,2>> &nodes,
+    double tol,
+    std::vector<char> &is_dirichlet,
+    Eigen::VectorXd &prescribed)
+{
+    const size_t Nnodes = nodes.size();
+
+    for (size_t n = 0; n < Nnodes; ++n) {
+        if (std::abs(nodes[n][0] - 0.0) < tol) {
+            int dof_u = 2 * static_cast<int>(n);
+            int dof_v = dof_u + 1;
+
+            is_dirichlet[dof_u] = 1;
+            prescribed[dof_u]   = 0.0;
+
+            is_dirichlet[dof_v] = 1;
+            prescribed[dof_v]   = 0.0;
+        }
+    }
+}
+
+void applyDirichletTopRightCorner(
+    const std::vector<std::array<double,2>> &nodes,
+    double tol,
+    std::vector<char> &is_dirichlet,
+    Eigen::VectorXd &prescribed)
+{
+    const size_t Nnodes = nodes.size();
+
+    for (size_t n = 0; n < Nnodes; ++n) {
+        if (std::abs(nodes[n][1] - 5.0) < tol &&
+            std::abs(nodes[n][0] - 5.0) < tol)
+        {
+            int dof_u = 2 * static_cast<int>(n);
+            int dof_v = dof_u + 1;
+
+            if (!is_dirichlet[dof_u]) {
+                is_dirichlet[dof_u] = 1;
+                prescribed[dof_u]   = 2.0;
+                prescribed[dof_v]   = 0.0;
+            }
+        }
+    }
+}
+void applyDirichletAtPoint(
+    const std::vector<std::array<double,2>> &nodes,
+    double x_target,
+    double y_target,
+    double tol,
+    double ux,
+    double uy,
+    std::vector<char> &is_dirichlet,
+    Eigen::VectorXd &prescribed)
+{
+    for (size_t n = 0; n < nodes.size(); ++n) {
+        if (std::abs(nodes[n][0] - x_target) < tol &&
+            std::abs(nodes[n][1] - y_target) < tol)
+        {
+            int dof = 2 * static_cast<int>(n);
+            is_dirichlet[dof]     = 1;
+            is_dirichlet[dof + 1] = 1;
+
+            prescribed[dof]     = ux;
+            prescribed[dof + 1] = uy;
+        }
+    }
+}
+
+
+void applyPointForceAtCoordinate(
+    const std::vector<std::array<double,2>> &nodes,
+    double x_target,
+    double y_target,
+    double tol,
+    double fx,
+    double fy,
+    Eigen::VectorXd &F)
+{
+    bool found = false;
+
+    for (size_t n = 0; n < nodes.size(); ++n) {
+        if (std::abs(nodes[n][0] - x_target) < tol &&
+            std::abs(nodes[n][1] - y_target) < tol)
+        {
+            int dof_u = 2 * static_cast<int>(n);
+            int dof_v = dof_u + 1;
+
+            if (dof_v >= F.size())
+                throw std::runtime_error("applyPointForceAtCoordinate: invalid DOF index");
+
+            F[dof_u] += fx;
+            F[dof_v] += fy;
+
+            found = true;
+        }
+    }
+
+    if (!found) {
+        throw std::runtime_error("applyPointForceAtCoordinate: no matching node found");
+    }
+}
+
+
+
 int main() {
     using namespace std;
     using size_type = linalg::size_type;
@@ -426,32 +526,16 @@ int main() {
     K.setFromTriplets(triplets.begin(), triplets.end());
 
     
-    
-    
     std::vector<char> is_dirichlet(Ndof, 0);
     Eigen::VectorXd prescribed = Eigen::VectorXd::Zero((Eigen::Index)Ndof);
     const double tol = 1e-3;
 
-    
-    for (size_t n = 0; n < nodes.size(); ++n) {
-        if (std::abs(nodes[n][0] - 0.0) < tol) {
-            is_dirichlet[2*n]     = 1; prescribed[2*n]     = 0.0;
-            is_dirichlet[2*n + 1] = 1; prescribed[2*n + 1] = 0.0;
-        }
-    }
 
+    //applyDirichletAtPoint(nodes,5.0,5.0, tol,2.0,0.0, is_dirichlet, prescribed); 
+    applyPointForceAtCoordinate(nodes, 5.0,5.0, tol, 10000.0, 0, F);
+    applyDirichletLeftBoundary(nodes, tol, is_dirichlet, prescribed);
     
-    for (size_t n = 0; n < nodes.size(); ++n) {
-        if ((std::abs(nodes[n][1] - 5.0) < tol)&&(std::abs(nodes[n][0] - 5.0) <tol)) {
-            int dof_u = 2 * static_cast<int>(n);
-            if (!is_dirichlet[dof_u]) {
-                is_dirichlet[dof_u] = 1;
-                prescribed[dof_u]   = 2.0;
-                prescribed[dof_u+1] = 0.0;
-            }
-        }
-    }
-    
+        
     applyDirichletStrong(K, F, is_dirichlet, prescribed);
     
     Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
